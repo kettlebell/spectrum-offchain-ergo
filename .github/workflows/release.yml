@@ -23,7 +23,7 @@ jobs:
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: spectrum-offchain-lm,spectrum-deploy-lm-pool
-          archive: app-$tag-$target
+          # archive: app-$tag-$target
           target: ${{ matrix.target }}
           build_tool: ${{ matrix.build_tool }}
         env:
@@ -62,7 +62,7 @@ jobs:
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
           bin: spectrum-offchain-lm,spectrum-deploy-lm-pool
-          archive: app-$tag-$target
+          # archive: app-$tag-$target
           target: x86_64-unknown-linux-gnu
           build_tool: cargo
         env:
