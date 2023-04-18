@@ -22,8 +22,8 @@ jobs:
         name: Install cross-compilation tools
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: spectrum-offchain-lm,spectrum-deploy-lm-pool
-          archive: $tag-$target
+          bin: spectrum-offchain-lm
+          archive: $bin-$tag-$target
           target: ${{ matrix.target }}
           build_tool: ${{ matrix.build_tool }}
         env:
@@ -61,8 +61,8 @@ jobs:
         run: git config --global --add safe.directory /__w/spectrum-offchain-lm/spectrum-offchain-lm
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: spectrum-offchain-lm,spectrum-deploy-lm-pool
-          archive: $tag-$target
+          bin: spectrum-offchain-lm
+          archive: $bin-$tag-$target
           target: x86_64-unknown-linux-gnu
           build_tool: cargo
         env:
@@ -83,7 +83,7 @@ jobs:
       - run: echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
       - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          bin: spectrum-offchain-lm,spectrum-deploy-lm-pool
+          bin: spectrum-offchain-lm
           target: ${{ matrix.target }}
           build_tool: ${{ matrix.build_tool }}
         env:
