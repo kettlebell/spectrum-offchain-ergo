@@ -6,85 +6,88 @@ on:
   workflow_dispatch:
 
 jobs:
-  upload-assets:
+  release:
+    name: Release - ${{ matrix.platform.release_for }}
+    if: startsWith( github.ref, 'refs/tags/v' ) || github.ref == 'refs/tags/test-release'
+    needs: [test]
     strategy:
       matrix:
-        include:
-          - target: aarch64-unknown-linux-gnu
+        platform:
+          - release_for: Linux-x86_64
             os: ubuntu-20.04
-            build_tool: cross # Use https://github.com/cross-rs/cross for ARM
-          - target: x86_64-apple-darwin
-            os: macos-latest
-            build_tool: cargo
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-        name: Install cross-compilation tools
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: spectrum-offchain-lm
-          archive: $bin-$tag-$target
-          target: ${{ matrix.target }}
-          build_tool: ${{ matrix.build_tool }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            target: x86_64-unknown-linux-gnu
+            bin: spectrum-offchain-lm
+            name: spectrum-offchain-lm-Linux-x86_64-musl.tar.gz
 
-  upload-asset-x86-ubuntu-18:
-    runs-on: ubuntu-latest
-    container: 'ubuntu:18.04'
-    steps:
-      - name: Install dependencies
-        run: |
-          apt update -y 
-          apt install --no-install-recommends -y \
-            ca-certificates curl jq zip \
-            clang make gcc g++ libssl-dev pkg-config protobuf-compiler
-      - name: Install modern Git
-        run: |
-          apt install -y software-properties-common 
-          add-apt-repository ppa:git-core/ppa 
-          apt update -y 
-          apt install git -y
-      - name: Install Github CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-          && apt update \
-          && apt install gh -y
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: actions/checkout@v3
-      - name: fit git warning of dubious ownership
-        run: git config --global --add safe.directory /__w/spectrum-offchain-lm/spectrum-offchain-lm
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: spectrum-offchain-lm
-          archive: $bin-$tag-$target
-          target: x86_64-unknown-linux-gnu
-          build_tool: cargo
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  upload-asset-windows:
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-pc-windows-msvc
+          - release_for: Windows-x86_64
             os: windows-latest
-            build_tool: cargo
-    runs-on: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: spectrum-offchain-lm.exe
+            name: spectrum-offchain-lm.exe-Windows-x86_64.zip
+
+          - release_for: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: spectrum-offchain-lm
+            name: spectrum-offchain-lm-Darwin-x86_64.tar.gz
+
+          - release_for: macOS-aarch64
+            os: macOS-latest
+            target: aarch64-apple-darwin
+            bin: spectrum-offchain-lm
+            name: spectrum-offchain-lm-Darwin-aarch64.tar.gz
+
+          - release_for: Linux-x86_64
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            bin: spectrum-deploy-lm-pool
+            name: spectrum-deploy-lm-pool-Linux-x86_64-musl.tar.gz
+
+          - release_for: Windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: spectrum-deploy-lm-pool.exe
+            name: spectrum-deploy-lm-pool.exe-Windows-x86_64.zip
+
+          - release_for: macOS-x86_64
+            os: macOS-latest
+            target: x86_64-apple-darwin
+            bin: spectrum-deploy-lm-pool
+            name: spectrum-deploy-lm-pool-Darwin-x86_64.tar.gz
+
+          - release_for: macOS-aarch64
+            os: macOS-latest
+            target: aarch64-apple-darwin
+            bin: spectrum-deploy-lm-pool
+            name: spectrum-deploy-lm-pool-Darwin-aarch64.tar.gz
+    runs-on: ${{ matrix.platform.os }}
     steps:
-      - uses: actions/checkout@v3
-      - run: echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - run: vcpkg install openssl:x64-windows-static-md
-      - run: echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - uses: taiki-e/upload-rust-binary-action@v1
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
         with:
-          bin: spectrum-offchain-lm
-          target: ${{ matrix.target }}
-          build_tool: ${{ matrix.build_tool }}
+          target: ${{ matrix.platform.target }}
+          args: "--locked --release"
+          strip: true
+      - name: Package as archive
+        shell: bash
+        run: |
+          cd target/${{ matrix.platform.target }}/release
+          if [[ "${{ matrix.platform.os }}" == "windows-latest" ]]; then
+            7z a ../../../${{ matrix.platform.name }} ${{ matrix.platform.bin }}
+          else
+            tar czvf ../../../${{ matrix.platform.name }} ${{ matrix.platform.bin }}
+          fi
+          cd -
+      - name: Generate SHA-256
+        if: matrix.platform.os == 'macOS-latest'
+        run: shasum -a 256 ${{ matrix.platform.name }}
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: "spectrum-*"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: startsWith( github.ref, 'refs/tags/v' )
