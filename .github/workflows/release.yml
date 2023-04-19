@@ -68,7 +68,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: "--release"
-          strip: true
+          strip: false
       - name: Package as archive
         shell: bash
         run: |
